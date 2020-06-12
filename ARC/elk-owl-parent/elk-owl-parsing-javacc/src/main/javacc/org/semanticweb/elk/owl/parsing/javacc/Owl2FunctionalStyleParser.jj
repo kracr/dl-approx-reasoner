@@ -1,0 +1,2092 @@
+/*
+ * #%L
+ * elk-reasoner
+ * *
+ * $Id$
+ * $HeadURL$
+ * %%
+ * Copyright (C) 2011 Oxford University Computing Laboratory
+ * %%
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ * #L%
+ */
+/** OWL 2 JavaCC parser
+ *
+ * Follows the official OWL 2 specifications:
+ * http://www.w3.org/TR/owl2-syntax/#Appendix:_Complete_Grammar_.28Normative.29
+ * Some lexing definitions use terminals from SPARQL specification:
+ * http://www.w3.org/TR/2008/REC-rdf-sparql-query-20080115/#sparqlGrammar
+ *
+ * @author Yevgeny Kazakov, Apr 19, 2011
+ * @author Markus Kroetzsch
+ * @author Pavel Klinov
+ */
+
+options
+{
+  UNICODE_INPUT = true;
+//  CACHE_TOKENS = true;
+  STATIC = false;
+}
+
+PARSER_BEGIN(AbstractOwl2FunctionalStyleParser)
+
+package org.semanticweb.elk.owl.parsing.javacc;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+
+import org.semanticweb.elk.owl.interfaces.ElkAnnotation;
+import org.semanticweb.elk.owl.interfaces.ElkAnnotationAssertionAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkAnnotationAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkAnnotationProperty;
+import org.semanticweb.elk.owl.interfaces.ElkAnnotationPropertyDomainAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkAnnotationPropertyRangeAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkAnnotationSubject;
+import org.semanticweb.elk.owl.interfaces.ElkAnnotationValue;
+import org.semanticweb.elk.owl.interfaces.ElkAnonymousIndividual;
+import org.semanticweb.elk.owl.interfaces.ElkAssertionAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkAsymmetricObjectPropertyAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkClass;
+import org.semanticweb.elk.owl.interfaces.ElkClassAssertionAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkClassAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkClassExpression;
+import org.semanticweb.elk.owl.interfaces.ElkDataAllValuesFrom;
+import org.semanticweb.elk.owl.interfaces.ElkDataComplementOf;
+import org.semanticweb.elk.owl.interfaces.ElkDataExactCardinality;
+import org.semanticweb.elk.owl.interfaces.ElkDataHasValue;
+import org.semanticweb.elk.owl.interfaces.ElkDataIntersectionOf;
+import org.semanticweb.elk.owl.interfaces.ElkDataMaxCardinality;
+import org.semanticweb.elk.owl.interfaces.ElkDataMinCardinality;
+import org.semanticweb.elk.owl.interfaces.ElkDataOneOf;
+import org.semanticweb.elk.owl.interfaces.ElkDataProperty;
+import org.semanticweb.elk.owl.interfaces.ElkDataPropertyAssertionAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkDataPropertyAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkDataPropertyDomainAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkDataPropertyExpression;
+import org.semanticweb.elk.owl.interfaces.ElkDataPropertyRangeAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkDataRange;
+import org.semanticweb.elk.owl.interfaces.ElkDataSomeValuesFrom;
+import org.semanticweb.elk.owl.interfaces.ElkDataUnionOf;
+import org.semanticweb.elk.owl.interfaces.ElkDatatype;
+import org.semanticweb.elk.owl.interfaces.ElkDatatypeDefinitionAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkDatatypeRestriction;
+import org.semanticweb.elk.owl.interfaces.ElkDeclarationAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkDifferentIndividualsAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkDisjointClassesAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkDisjointDataPropertiesAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkDisjointObjectPropertiesAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkDisjointUnionAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkEntity;
+import org.semanticweb.elk.owl.interfaces.ElkEquivalentClassesAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkEquivalentDataPropertiesAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkEquivalentObjectPropertiesAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkFacetRestriction;
+import org.semanticweb.elk.owl.interfaces.ElkFunctionalDataPropertyAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkFunctionalObjectPropertyAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkHasKeyAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkIndividual;
+import org.semanticweb.elk.owl.interfaces.ElkInverseFunctionalObjectPropertyAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkInverseObjectPropertiesAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkIrreflexiveObjectPropertyAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkLiteral;
+import org.semanticweb.elk.owl.interfaces.ElkNamedIndividual;
+import org.semanticweb.elk.owl.interfaces.ElkNegativeDataPropertyAssertionAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkNegativeObjectPropertyAssertionAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkObject;
+import org.semanticweb.elk.owl.interfaces.ElkObjectAllValuesFrom;
+import org.semanticweb.elk.owl.interfaces.ElkObjectComplementOf;
+import org.semanticweb.elk.owl.interfaces.ElkObjectExactCardinality;
+import org.semanticweb.elk.owl.interfaces.ElkObject.Factory;
+import org.semanticweb.elk.owl.interfaces.ElkObjectHasSelf;
+import org.semanticweb.elk.owl.interfaces.ElkObjectHasValue;
+import org.semanticweb.elk.owl.interfaces.ElkObjectIntersectionOf;
+import org.semanticweb.elk.owl.interfaces.ElkObjectInverseOf;
+import org.semanticweb.elk.owl.interfaces.ElkObjectMaxCardinality;
+import org.semanticweb.elk.owl.interfaces.ElkObjectMinCardinality;
+import org.semanticweb.elk.owl.interfaces.ElkObjectOneOf;
+import org.semanticweb.elk.owl.interfaces.ElkObjectProperty;
+import org.semanticweb.elk.owl.interfaces.ElkObjectPropertyAssertionAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkObjectPropertyAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkObjectPropertyChain;
+import org.semanticweb.elk.owl.interfaces.ElkObjectPropertyDomainAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkObjectPropertyExpression;
+import org.semanticweb.elk.owl.interfaces.ElkObjectPropertyRangeAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkObjectSomeValuesFrom;
+import org.semanticweb.elk.owl.interfaces.ElkObjectUnionOf;
+import org.semanticweb.elk.owl.interfaces.ElkReflexiveObjectPropertyAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkSameIndividualAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkSubAnnotationPropertyOfAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkSubClassOfAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkSubDataPropertyOfAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkSubObjectPropertyExpression;
+import org.semanticweb.elk.owl.interfaces.ElkSubObjectPropertyOfAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkSymmetricObjectPropertyAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkTransitiveObjectPropertyAxiom;
+import org.semanticweb.elk.owl.interfaces.ElkSWRLRule;
+import org.semanticweb.elk.owl.iris.ElkAbbreviatedIri;
+import org.semanticweb.elk.owl.iris.ElkFullIri;
+import org.semanticweb.elk.owl.iris.ElkIri;
+import org.semanticweb.elk.owl.iris.ElkPrefix;
+import org.semanticweb.elk.owl.iris.ElkPrefixDeclarations;
+import org.semanticweb.elk.owl.iris.ElkPrefixImpl;
+import org.semanticweb.elk.owl.parsing.Owl2ParseException;
+import org.semanticweb.elk.owl.parsing.Owl2Parser;
+import org.semanticweb.elk.owl.parsing.Owl2ParserAxiomProcessor;
+
+public abstract class AbstractOwl2FunctionalStyleParser implements Owl2Parser {
+
+	/**
+	 * Get prefix declarations to resolve IRIs.
+	 */
+	protected abstract ElkPrefixDeclarations getElkPrefixDeclarations();
+
+	/**
+	 * Get a factory used for creating of ELK Objects.
+	 */
+	protected abstract ElkObject.Factory getElkObjectFactory();
+
+	@Override
+	public void declarePrefix(ElkPrefix prefix) {
+		getElkPrefixDeclarations().addPrefix(prefix);
+	}
+
+	@Override
+	public void accept(Owl2ParserAxiomProcessor axiomProcessor)
+				throws Owl2ParseException {
+		try {
+			ontologyDocument(axiomProcessor);
+		} catch (ParseException e) {
+			throw new Owl2ParseException("Cannot parse the ontology!", e);
+		} finally {
+			axiomProcessor.finish();
+		}
+	}
+
+}
+
+PARSER_END(AbstractOwl2FunctionalStyleParser)
+
+
+SKIP :
+{
+  " "
+| "\t"
+| "\n"
+| "\r"
+}
+
+TOKEN :
+{
+  < OPEN_BRACKET: "(" >
+| < CLOSE_BRACKET: ")" >
+| < EQUALS: "=" > 
+| < REFERENCE: "^^" >
+
+
+/* Reserved Keywords */
+// | < OWL_BACKWARD_COMPATIBLE_WITH: "owl:backwardCompatibleWith" >
+// | < OWL_BOTTOM_DATA_PROPERTY: "owl:bottomDataProperty" >
+// | < OWL_BOTTOM_OBJECT_PROPERTY: "owl:bottomObjectProperty" >
+// | < OWL_DEPRECATED: "owl:deprecated" >
+// | < OWL_INCOMPATIBLE_WITH: "owl:incompatibleWith" >
+// | < OWL_NOTHING: "owl:Nothing" >
+// | < OWL_PRIOR_VERSION: "owl:priorVersion" >
+// | < OWL_RATIONAL: "owl:rational" >
+// | < OWL_REAL: "owl:real" >
+// | < OWL_VERSION_INFO: "owl:versionInfo" >
+// | < OWL_THING: "owl:Thing" >
+// | < OWL_TOP_DATA_PROPERTY: "owl:topDataProperty" >
+// | < OWL_TOP_OBJECT_PROPERTY: "owl:topObjectProperty" >
+// | < RDF_LANG_RANGE: "rdf:langRange" >
+// | < RDF_PLAIN_LITERAL: "rdf:PlainLiteral" >
+// | < RDF_XML_LITERAL: "rdf:XMLLiteral" >
+// | < RDFS_COMMENT: "rdfs:comment" >
+// | < RDFS_IS_DEFINED_BY: "rdfs:isDefinedBy" >
+// | < RDFS_LABEL: "rdfs:label" >
+// | < RDFS_LITERAL: "rdfs:Literal" >
+// | < RDFS_SEE_ALSO: "rdfs:seeAlso" >
+// | < XSD_ANY_URI: "xsd:anyURI" >
+// | < XSD_BASE_64_BINARY: "xsd:base64Binary" >
+// | < XSD_BOOLEAN: "xsd:boolean" >
+// | < XSD_BYTE: "xsd:byte" >
+// | < XSD_DATE_TIME: "xsd:dateTime" >
+// | < XSD_DATE_TIME_STAMP: "xsd:dateTimeStamp" >
+// | < XSD_DECIMAL: "xsd:decimal" >
+// | < XSD_DOUBLE: "xsd:double" >
+// | < XSD_FLOAT: "xsd:float" >
+// | < XSD_HEX_BINARY: "xsd:hexBinary" >
+// | < XSD_INT: "xsd:int" >
+// | < XSD_INTEGER: "xsd:integer" >
+// | < XSD_LANGUAGE: "xsd:language" >
+// | < XSD_LENGTH: "xsd:length" >
+// | < XSD_LONG: "xsd:long" >
+// | < XSD_MAX_EXCLUSIVE: "xsd:maxExclusive" >
+// | < XSD_MAX_INCLUSIVE: "xsd:maxInclusive" >
+// | < XSD_MAX_LENGTH: "xsd:maxLength" >
+// | < XSD_MIN_EXCLUSIVE: "xsd:minExclusive" >
+// | < XSD_MIN_INCLUSIVE: "xsd:minInclusive" >
+// | < XSD_MIN_LENGTH: "xsd:minLength" >
+// | < XSD_NAME: "xsd:Name" >
+// | < XSD_NC_NAME: "xsd:NCName" >
+// | < XSD_NEGATIVE_INTEGER: "xsd:negativeInteger" >
+// | < XSD_NMTOKEN: "xsd:NMTOKEN" >
+// | < XSD_NON_NEGATIVE_INTEGER: "xsd:nonNegativeInteger" >
+// | < XSD_NON_POSITIVE_INTEGER: "xsd:nonPositiveInteger" >
+// | < XSD_NORMALIZED_STRING: "xsd:normalizedString" >
+// | < XSD_PATTERN: "xsd:pattern" >
+// | < XSD_POSITIVE_INTEGER: "xsd:positiveInteger" >
+// | < XSD_SHORT: "xsd:short" >
+// | < XSD_STRING: "xsd:string" >
+// | < XSD_TOKEN: "xsd:token" >
+// | < XSD_UNSIGNED_BYTE: "xsd:unsignedByte" >
+// | < XSD_UNSIGNED_INT: "xsd:unsignedInt" >
+// | < XSD_UNSIGNED_LONG: "xsd:unsignedLong" >
+// | < XSD_UNSIGNED_SHORT: "xsd:unsignedShort" >
+
+/* Ontology Keywords */
+| < PREFIX: "Prefix" >
+| < ONTOLOGY: "Ontology" >
+| < IMPORT: "Import" >
+
+/* Entities and Literals */
+| < CLASS: "Class" >
+| < DATATYPE: "Datatype" >
+| < OBJECT_PROPERTY: "ObjectProperty" >
+| < DATA_PROPERTY: "DataProperty" >
+| < ANNOTATION_PROPERTY: "AnnotationProperty" >
+| < NAMED_INDIVIDUAL: "NamedIndividual" >
+
+/* Declaration */
+| < DECLARATION: "Declaration" >
+
+/* Property Expressions */
+| < OBJECT_INVERSE_OF: "ObjectInverseOf" >
+| < OBJECT_PROPERTY_CHAIN: "ObjectPropertyChain" >
+
+/* Data Ranges */
+| < COMPLEMENT_OF: "ComplementOf" >
+| < ONE_OF: "OneOf" >
+| < DATATYPE_RESTRICTION: "DatatypeRestriction" >
+
+/* Class Expressions */
+| < OBJECT_INTERSECTION_OF: "ObjectIntersectionOf" >
+| < OBJECT_UNION_OF: "ObjectUnionOf" >
+| < OBJECT_COMPLEMENT_OF: "ObjectComplementOf" >
+| < OBJECT_ONE_OF: "ObjectOneOf" >
+| < OBJECT_SOME_VALUES_FROM: "ObjectSomeValuesFrom" >
+| < OBJECT_ALL_VALUES_FROM: "ObjectAllValuesFrom" >
+| < OBJECT_HAS_VALUE: "ObjectHasValue" >
+| < OBJECT_HAS_SELF: "ObjectHasSelf" >
+| < OBJECT_MIN_CARDINALITY: "ObjectMinCardinality" >
+| < OBJECT_MAX_CARDINALITY: "ObjectMaxCardinality" >
+| < OBJECT_EXACT_CARDINALITY: "ObjectExactCardinality" >
+| < DATA_INTERSECTION_OF: "DataIntersectionOf" >
+| < DATA_UNION_OF: "DataUnionOf" >
+| < DATA_COMPLEMENT_OF: "DataComplementOf" >
+| < DATA_ONE_OF: "DataOneOf" >
+| < DATA_SOME_VALUES_FROM: "DataSomeValuesFrom" >
+| < DATA_ALL_VALUES_FROM: "DataAllValuesFrom" >
+| < DATA_HAS_VALUE: "DataHasValue" >
+| < DATA_MIN_CARDINALITY: "DataMinCardinality" >
+| < DATA_MAX_CARDINALITY: "DataMaxCardinality" >
+| < DATA_EXACT_CARDINALITY: "DataExactCardinality" >
+
+/* Class Expressions Axioms */
+| < SUB_CLASS_OF: "SubClassOf" >
+| < EQUIVALENT_CLASSES: "EquivalentClasses" >
+| < DISJOINT_CLASSES: "DisjointClasses" >
+| < DISJOINT_UNION: "DisjointUnion" >
+
+/* Object Property Axioms */
+| < SUB_OBJECT_PROPERTY_OF: "SubObjectPropertyOf" >
+| < EQUIVALENT_OBJECT_PROPERTIES: "EquivalentObjectProperties" >
+| < DISJOINT_OBJECT_PROPERTIES: "DisjointObjectProperties" >
+| < OBJECT_PROPERTY_DOMAIN: "ObjectPropertyDomain" >
+| < OBJECT_PROPERTY_RANGE: "ObjectPropertyRange" >
+| < INVERSE_OBJECT_PROPERTIES: "InverseObjectProperties" >
+| < FUNCTIONAL_OBJECT_PROPERTY: "FunctionalObjectProperty" >
+| < INVERSE_FUNCTIONAL_OBJECT_PROPERTY: "InverseFunctionalObjectProperty" >
+| < REFLEXIVE_OBJECT_PROPERTY: "ReflexiveObjectProperty" >
+| < IRREFLEXIVE_OBJECT_PROPERTY: "IrreflexiveObjectProperty" >
+| < SYMMETRIC_OBJECT_PROPERTY: "SymmetricObjectProperty" >
+| < ASYMMETRIC_OBJECT_PROPERTY: "AsymmetricObjectProperty" >
+| < TRANSITIVE_OBJECT_PROPERTY: "TransitiveObjectProperty" >
+
+/* Data Property Axioms */
+| < SUB_DATA_PROPERTY_OF: "SubDataPropertyOf" >
+| < EQUIVALENT_DATA_PROPERTIES: "EquivalentDataProperties" >
+| < DISJOINT_DATA_PROPERTIES: "DisjointDataProperties" >
+| < DATA_PROPERTY_DOMAIN: "DataPropertyDomain" >
+| < DATA_PROPERTY_RANGE: "DataPropertyRange" >
+| < FUNCTIONAL_DATA_PROPERTY: "FunctionalDataProperty" >
+| < DATATYPE_DEFINITION: "DatatypeDefinition" >
+
+/* Keys */
+| < HAS_KEY: "HasKey" >
+
+/* SWRL Rules (DL Safe) */
+| < SWRL_RULE: "DLSafeRule" >
+| < SWRL_BODY: "Body" >
+| < SWRL_HEAD: "Head" >
+| < SWRL_CLASS_ATOM: "ClassAtom" >
+| < SWRL_DATA_RANGE_ATOM: "DataRangeAtom" >
+| < SWRL_OBJECT_PROPERTY_ATOM: "ObjectPropertyAtom" >
+| < SWRL_DATA_PROPERTY_ATOM: "DataPropertyAtom" >
+| < SWRL_BUILTIN_ATOM: "BuiltInAtom" >
+| < SWRL_SAME_INDIVIDUALS_ATOM: "SameIndividualsAtom" >
+| < SWRL_DIFFERENT_INDIVIDUALS_ATOM: "DifferentIndividualsAtom" >
+| < SWRL_VARIABLE: "Variable" >
+
+/* Assertions */
+| < SAME_INDIVIDUAL: "SameIndividual" >
+| < DIFFERENT_INDIVIDUALS: "DifferentIndividuals" >
+| < CLASS_ASSERTION: "ClassAssertion" >
+| < OBJECT_PROPERTY_ASSERTION: "ObjectPropertyAssertion" >
+| < NEGATIVE_OBJECT_PROPERTY_ASSERTION: "NegativeObjectPropertyAssertion" >
+| < DATA_PROPERTY_ASSERTION: "DataPropertyAssertion" >
+| < NEGATIVE_DATA_PROPERTY_ASSERTION: "NegativeDataPropertyAssertion" >
+
+/* Annotations */
+| < ANNOTATION: "Annotation" >
+| < ANNOTATION_ASSERTION: "AnnotationAssertion" >
+| < SUB_ANNOTATION_PROPERTY_OF: "SubAnnotationPropertyOf" >
+| < ANNOTATION_PROPERTY_DOMAIN: "AnnotationPropertyDomain" >
+| < ANNOTATION_PROPERTY_RANGE: "AnnotationPropertyRange" >
+
+| < NON_NEGATIVE_INTEGER: (<DIGIT>)+ >
+| < LANGTAG: "@" ( ["a"-"z","A"-"Z"])+ ("-" (["a"-"z","A"-"Z"]|<DIGIT>)+ )* >
+
+| < PNAME_NS: (<PN_PREFIX>)? ":" > : AfterPrefix
+| < #PN_PREFIX: <PN_CHARS_BASE> ( ( <PN_CHARS> | "." )* <PN_CHARS> )? >
+| < BLANK_NODE_PREFIX: "_:" > : AfterPrefix
+// | < PNAME_LN: <PNAME_NS> <PN_LOCAL> >
+// | < BLANK_NODE_LABEL: "_:" <PN_LOCAL> >
+
+/* Auxiliary character tokens */
+| < #DIGIT: ["0"-"9"] >
+| < #PN_CHARS_U: <PN_CHARS_BASE> | "_" >
+| < #PN_CHARS:
+      <PN_CHARS_U>
+    | "-"
+    | <DIGIT>
+    | "\u00B7"
+    | ["\u0300"-"\u036F"]
+    | ["\u203F"-"\u2040"]
+  >
+| < #PN_CHARS_BASE:
+      ["a"-"z"]
+    | ["A"-"Z"]
+    | ["\u00C0"-"\u00D6"]
+    | ["\u00D8"-"\u00F6"]
+    | ["\u00F8"-"\u02FF"]
+    | ["\u0370"-"\u037D"]
+    | ["\u037F"-"\u1FFF"]
+    | ["\u200C"-"\u200D"]
+    | ["\u2070"-"\u218F"]
+    | ["\u2C00"-"\u2FEF"]
+    | ["\u3001"-"\uD7FF"]
+    | ["\uF900"-"\uFDCF"]
+    | ["\uFDF0"-"\uFFFD"]
+  >
+}
+
+SKIP : 
+{ 
+  "<" : FullIri
+| "\"" : QuotedString
+| "#" : Comment
+}
+
+<FullIri> TOKEN : 
+{ 
+  /* based on IRI_REF of [SPARQL] */
+  < FULL_IRI: ( ~["<",">","\"","{","}","|","^","`","\\","\u0000"-"\u0020"] )* > : FullIriEnd
+}
+
+<FullIriEnd> SKIP :
+{
+  ">" : DEFAULT
+}
+
+<AfterPrefix> TOKEN :
+{
+  < PN_LOCAL: ( <PN_CHARS_U> | <DIGIT> ) ( ( <PN_CHARS> | "." )* <PN_CHARS>)? > : DEFAULT
+}
+
+<AfterPrefix> SKIP :
+{
+  "" : DEFAULT
+}
+
+<QuotedString> TOKEN :
+{
+  < QUOTED_STRING: ( ~["\\","\""]  |  ("\\" ["\"","\'","\\"]) )* > : QuotedStringEnd
+}            
+
+<QuotedStringEnd> SKIP :
+{
+  "\"" : DEFAULT
+}
+
+<Comment> SKIP :
+{
+  "\n": DEFAULT
+| "\r": DEFAULT
+}
+
+<Comment> SKIP :
+{
+  < ~[] >	
+}
+
+
+/*------------------------------------------------------------------
+ * PARSER RULES
+ *------------------------------------------------------------------*/
+
+/* 2 Preliminary Definitions */
+
+/* 2.3 Integers, Characters, Strings, Language Tags, and Node IDs */
+/* @ (U+40) followed a nonempty sequence of characters matching the
+* langtag production from [BCP 47]
+*/
+String languageTag():
+{
+	Token t;
+}{
+	t = <LANGTAG> {
+		return t.image;
+	}
+}
+
+/* See LANGTAG in [SPARQL] */
+/* a finite sequence of characters matching the BLANK_NODE_LABEL
+* production of [SPARQL]
+*/
+String nodeId():
+{
+	Token t;
+}{
+	t = <BLANK_NODE_PREFIX> <PN_LOCAL> {
+		return t.image;
+	}
+}
+
+
+/* 2.3 IRIs */
+/* An iri as defined in [RFC3987], enclosed in a pair of < (U+3C) and >
+* (U+3E) characters. See IRI_REF in [SPARQL].
+* The function returns only the IRI part of the string without the
+* enclosing < >.
+*/
+ElkFullIri fullIri():
+{
+	Token t;
+}{
+	t = <FULL_IRI> {
+		return new ElkFullIri(t.image);
+	}
+}
+
+/* Extract the actual IRI from a full IRI or abbreviated IRI */
+ElkIri iri():
+{
+	ElkIri x;
+}{
+	(
+	  x = fullIri()
+	| x = abbreviatedIri()
+	) { return x; }
+}
+
+/* 
+* A finite sequence of characters matching the PNAME_LN production of
+* [SPARQL]. The function returns the IRI that the abbreviation encodes
+* based on the known prefix declarations.
+*/
+ElkAbbreviatedIri abbreviatedIri():
+{
+	String prefixName;
+	ElkPrefix prefix;
+	Token t;
+}{
+	prefixName = prefixName()
+	t = <PN_LOCAL> {
+		prefix = getElkPrefixDeclarations().getPrefix(prefixName);
+		if ( prefix != null ) {
+			return new ElkAbbreviatedIri(prefix, t.image);
+		} else {
+			throw new ParseException("Unknown prefix " + prefixName + ".");
+		}
+	}
+}
+
+/* a finite sequence of characters matching the as PNAME_NS production of
+* [SPARQL]
+*/
+String prefixName():
+{
+	Token t = null;
+}{
+	t = <PNAME_NS> {
+		return t.image;
+	}
+}
+
+
+/* 3 Ontologies */
+
+/* 3.5 Ontology Annotations */
+void ontologyAnnotations():
+{}{
+	( annotation() )*
+}
+
+/* 3.7 Functional-Style Syntax */
+void ontologyDocument(Owl2ParserAxiomProcessor axiomProcessor) throws Owl2ParseException:
+{}{
+	( prefixDeclaration(axiomProcessor) )* ontology(axiomProcessor)
+}
+
+void prefixDeclaration(Owl2ParserAxiomProcessor axiomProcessor) throws Owl2ParseException:
+{
+	String name;
+	ElkFullIri iri;
+}{
+	<PREFIX> <OPEN_BRACKET>
+		name = prefixName()
+		<EQUALS>
+		iri = fullIri()
+	<CLOSE_BRACKET> {
+		ElkPrefix prefix = new ElkPrefixImpl(name, iri);
+	
+		if ( !getElkPrefixDeclarations().addPrefix( prefix ) ) {
+			throw new ParseException("Duplicate declaration of prefix " + name + ".");
+		}
+		
+		axiomProcessor.visit(prefix);
+	}
+}
+
+void ontology(Owl2ParserAxiomProcessor axiomProcessor) throws Owl2ParseException:
+{}{
+	<ONTOLOGY> <OPEN_BRACKET> ( ontologyIri() ( versionIri() )? )?
+		directlyImportsDocuments()
+		ontologyAnnotations()
+		axioms(axiomProcessor)
+	<CLOSE_BRACKET>
+}
+
+ElkIri ontologyIri():
+{
+	ElkIri x;
+}{
+	x = iri() { return x; }
+}
+
+ElkIri versionIri():
+{
+	ElkIri x;
+}{
+	x = iri() { return x; }
+}
+
+void directlyImportsDocuments():
+{}{
+	( <IMPORT> <OPEN_BRACKET> iri() <CLOSE_BRACKET> )*
+}
+
+void axioms(Owl2ParserAxiomProcessor axiomProcessor) throws Owl2ParseException:
+{
+	ElkAxiom x;
+}{
+	( x = axiom() { axiomProcessor.visit(x); } )*
+}
+
+
+/* 4 Datatype Maps */
+
+/* 4.1 Real Numbers, Decimal Numbers, and Integers */
+// void dtRealsDecimalsIntegers():
+// {}{
+// 	<OWL_REAL>
+// 	| <OWL_RATIONAL>
+// 	| <XSD_DECIMAL>
+// 	| <XSD_INTEGER>
+// 	| <XSD_NON_NEGATIVE_INTEGER>
+// 	| <XSD_NON_POSITIVE_INTEGER>
+// 	| <XSD_POSITIVE_INTEGER>
+// 	| <XSD_NEGATIVE_INTEGER>
+// 	| <XSD_LONG>
+// 	| <XSD_INT>
+// 	| <XSD_SHORT>
+// 	| <XSD_BYTE>
+// 	| <XSD_UNSIGNED_LONG>
+// 	| <XSD_UNSIGNED_INT>
+// 	| <XSD_UNSIGNED_SHORT>
+// 	| <XSD_UNSIGNED_BYTE>
+// }
+
+/* 4.2 Floating-Point Numbers */
+// void dtFloats():
+// {}{
+// 	<XSD_DOUBLE>
+// 	| <XSD_FLOAT>
+// }
+/* 4.3 Strings */
+// void dtStrings():
+// {}{
+// 	<RDF_PLAIN_LITERAL>
+// 	| <XSD_STRING>
+// 	| <XSD_NORMALIZED_STRING>
+// 	| <XSD_TOKEN>
+// 	| <XSD_LANGUAGE>
+// 	| <XSD_NAME>
+// 	| <XSD_NC_NAME>
+// 	| <XSD_NMTOKEN>
+// }
+
+/* 4.4 Boolean Values */
+// void dtBooleans():
+// {}{
+// 	<XSD_BOOLEAN>
+// }
+
+/* 4.5 Binary Data */
+// void dtBinaryData():
+// {}{
+// 	<XSD_HEX_BINARY>
+// 	| <XSD_BASE_64_BINARY>
+// }
+
+/* 4.6 IRIs */
+// void dtIris():
+// {}{
+// 	<XSD_ANY_URI>
+// }
+
+/* 4.7 Time Instants */
+// void dtTimeInstants():
+// {}{
+// 	<XSD_DATE_TIME_STAMP>
+// }
+
+/* 4.8 XML Literals */
+// void dtXmlLiterals():
+// {}{
+// 	<RDF_XML_LITERAL>
+// }
+
+
+/* 5 Entities and Literals */
+
+/* 5.1 Classes */
+ElkClass clazz():
+{
+	ElkIri x;
+}{
+	x = iri() { return getElkObjectFactory().getClass(x); }
+}
+
+/* 5.2 Datatypes */
+ElkDatatype datatype():
+{
+	ElkIri x;
+}{
+	x = iri() {
+		return getElkObjectFactory().getDatatype(x);
+	}
+}
+
+/* 5.3 Object Properties */
+ElkObjectProperty objectProperty():
+{
+	ElkIri x;
+}{
+	x = iri() {
+		return getElkObjectFactory().getObjectProperty(x);
+	}
+}
+
+/* 5.4 Data Properties */
+ElkDataProperty dataProperty():
+{
+	ElkIri x;
+}{
+	x = iri() {
+		return getElkObjectFactory().getDataProperty(x);
+	}
+}
+
+/* 5.5 Annotation Properties */
+ElkAnnotationProperty annotationProperty():
+{
+	ElkIri x;
+}{
+	x = iri() {
+		return getElkObjectFactory().getAnnotationProperty(x);
+	}
+// 	| <RDFS_LABEL>
+// 	| <RDFS_COMMENT>
+// 	| <RDFS_SEE_ALSO>
+// 	| <RDFS_IS_DEFINED_BY>
+// 	| <OWL_DEPRECATED>
+// 	| <OWL_VERSION_INFO>
+// 	| <OWL_PRIOR_VERSION>
+// 	| <OWL_BACKWARD_COMPATIBLE_WITH>
+// 	| <OWL_INCOMPATIBLE_WITH>
+}
+
+/* 5.6 Individuals */
+ElkIndividual individual():
+{
+	ElkIndividual x;
+}{
+	(
+	  x = namedIndividual()
+	| x = anonymousIndividual()
+	) { return x; }
+}
+
+/* 5.6.1 Named Individuals */
+ElkNamedIndividual namedIndividual():
+{
+	ElkIri x;
+}{
+	x = iri() {
+		return getElkObjectFactory().getNamedIndividual(x);
+	}
+}
+
+/* 5.6.2 Anonymous Individuals */
+ElkAnonymousIndividual anonymousIndividual():
+{
+	String x;
+}{
+/* TODO: something is needed to prevent node IDs to cross-refer between ontologies. */
+	x = nodeId() {
+		return getElkObjectFactory().getAnonymousIndividual(x);
+	}
+}
+
+/* 5.7 Literals */
+ElkLiteral literal():
+{
+	Token t;
+	String lexform;
+	String langtag = null;
+	ElkDatatype d = null;
+}{
+	lexform = quotedString()
+	(
+		<REFERENCE> d = datatype()
+		| ( langtag = languageTag() )?
+	) {
+		if ( d == null ) {
+			d = getElkObjectFactory().getDatatypeRdfPlainLiteral();
+			if ( langtag == null ) {
+				lexform = lexform + "@";
+			} else {
+				lexform = lexform + langtag;
+			}
+		}
+		return getElkObjectFactory().getLiteral(lexform, d);
+	}
+}
+
+/* Retrieve the content of a quoted string. */
+String quotedString():
+{
+	Token t;
+}{
+	t = <QUOTED_STRING> {
+		return t.image;
+	}
+}
+
+/* 5.8 Entity Declarations and Typing */
+ElkDeclarationAxiom declaration():
+{
+	ElkEntity x;
+}{
+	<DECLARATION> <OPEN_BRACKET> axiomAnnotations()
+	x = entity()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getDeclarationAxiom(x);
+	}
+}
+
+ElkEntity entity():
+{
+  ElkEntity x = null; //TODO
+}{ (
+    <CLASS> <OPEN_BRACKET> x = clazz() <CLOSE_BRACKET>
+	| <DATATYPE> <OPEN_BRACKET> x = datatype() <CLOSE_BRACKET>
+	| <OBJECT_PROPERTY> <OPEN_BRACKET> x = objectProperty() <CLOSE_BRACKET>
+	| <DATA_PROPERTY> <OPEN_BRACKET> x = dataProperty() <CLOSE_BRACKET>
+	| <ANNOTATION_PROPERTY> <OPEN_BRACKET> x = annotationProperty() <CLOSE_BRACKET>
+	| <NAMED_INDIVIDUAL> <OPEN_BRACKET> x = namedIndividual() <CLOSE_BRACKET>
+   ) { return x; }
+}
+
+/* 6 Property Expressions */
+ElkObjectPropertyExpression objectPropertyExpression():
+{
+	ElkObjectPropertyExpression x;
+}{
+	(
+	x = objectProperty()
+	| x = inverseObjectProperty()
+	) { return x; }
+}
+
+void addObjectPropertyExpression(Collection<ElkObjectPropertyExpression> opexprs):
+{
+	ElkObjectPropertyExpression x;
+}{
+	(
+	x = objectPropertyExpression()
+	) { opexprs.add(x); }
+}
+
+/* 6.1.1 Inverse Object Properties */
+ElkObjectInverseOf inverseObjectProperty():
+{
+	ElkObjectProperty x;
+}{
+	<OBJECT_INVERSE_OF> <OPEN_BRACKET>
+		x = objectProperty()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getObjectInverseOf(x);
+	}
+}
+
+/* 6.2 Data Property Expressions */
+ElkDataPropertyExpression dataPropertyExpression():
+{
+	ElkDataPropertyExpression x;
+}{
+	x = dataProperty() { return x; }
+}
+
+
+void addDataPropertyExpression(Collection<ElkDataPropertyExpression> dpexprs):
+{
+	ElkDataPropertyExpression x;
+}{
+	x = dataProperty() { dpexprs.add(x); }
+}
+
+/* 7 Data Ranges */
+
+ElkDataRange dataRange():
+{
+	ElkDataRange x;
+}{
+	(
+	x = datatype()
+	| x = dataIntersectionOf()
+	| x = dataUnionOf()
+	| x = dataComplementOf()
+	| x = dataOneOf()
+	| x = datatypeRestriction()
+	) { return x; }
+}
+
+List<ElkDataRange> twoOrMoreDataRanges():
+{
+	ElkDataRange x;
+	List<ElkDataRange> v =
+		new ArrayList<ElkDataRange> ();
+}{
+	x = dataRange() { v.add(x); }
+	( x = dataRange() { v.add(x); } )+
+	{ return v; }
+}
+
+/* 7.1 Intersection of Data Ranges */
+ElkDataIntersectionOf dataIntersectionOf():
+{
+	List<ElkDataRange> v;
+}{
+	<DATA_INTERSECTION_OF> <OPEN_BRACKET>
+		v = twoOrMoreDataRanges()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getDataIntersectionOf(v);
+	}
+}
+
+/* 7.2 Union of Data Ranges */
+ElkDataUnionOf dataUnionOf():
+{
+	List<ElkDataRange> v;
+}{
+	<DATA_UNION_OF> <OPEN_BRACKET>
+		v = twoOrMoreDataRanges()
+	<CLOSE_BRACKET>{
+		return getElkObjectFactory().getDataUnionOf(v);
+	}
+}
+
+/* 7.3 Complement of Data Ranges */
+ElkDataComplementOf dataComplementOf():
+{
+	ElkDataRange x;
+}{
+	<DATA_COMPLEMENT_OF> <OPEN_BRACKET>
+		x = dataRange()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getDataComplementOf(x);
+	}
+}
+
+/* 7.4 Enumeration of Literals */
+ElkDataOneOf dataOneOf():
+{
+	ElkLiteral x;
+	List<ElkLiteral> v =
+		new ArrayList<ElkLiteral> ();
+}{
+	<DATA_ONE_OF> <OPEN_BRACKET>
+		( x = literal() { v.add(x); } )+
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getDataOneOf(v);
+	}
+}
+
+/* 7.5 Datatype Restrictions */
+ElkDatatypeRestriction datatypeRestriction():
+{
+	ElkDatatype x;
+	List<ElkFacetRestriction> v = new ArrayList<ElkFacetRestriction>();
+}{
+	<DATATYPE_RESTRICTION> <OPEN_BRACKET>
+		x = datatype()
+		(addFacetRestriction(v))+
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getDatatypeRestriction(x,v);
+	}
+}
+
+void addFacetRestriction(Collection<ElkFacetRestriction> facetRestrs): 
+{
+	ElkIri restrIRI = null;
+	ElkLiteral literal = null;
+}{
+	restrIRI = iri()
+	literal = literal()
+// 	| <XSD_MIN_INCLUSIVE>
+// 	| <XSD_MAX_INCLUSIVE>
+// 	| <XSD_MIN_EXCLUSIVE>
+// 	| <XSD_MAX_EXCLUSIVE>
+// 	| <XSD_LENGTH>
+// 	| <XSD_MIN_LENGTH>
+// 	| <XSD_MAX_LENGTH>
+// 	| <XSD_PATTERN>
+// 	| <RDF_LANG_RANGE>
+	{
+		facetRestrs.add(getElkObjectFactory().getFacetRestriction(restrIRI, literal));
+	}
+}
+
+/* 8 Class Expressions */
+ElkClassExpression classExpression():
+{
+	ElkClassExpression x;
+}{ (
+	x = clazz()
+	| x = objectIntersectionOf()
+	| x = objectUnionOf()
+	| x = objectComplementOf()
+	| x = objectOneOf()
+	| x = objectSomeValuesFrom()
+	| x = objectAllValuesFrom()
+	| x = objectHasValue()
+	| x = objectHasSelf()
+	| x = objectMinCardinality()	
+	| x = objectMaxCardinality()	
+	| x = objectExactCardinality()
+	| x = dataSomeValuesFrom()
+	| x = dataAllValuesFrom()
+	| x = dataHasValue()
+	| x = dataMinCardinality()
+	| x = dataMaxCardinality()
+	| x = dataExactCardinality()	
+   ) { return x; }
+}
+
+
+/* 8.1 Propositional Connectives and Enumeration of Individuals */
+
+/* 8.1.1 Intersection of Class Expressions */
+ElkObjectIntersectionOf objectIntersectionOf():
+{
+	List<ElkClassExpression> v;
+}{
+	<OBJECT_INTERSECTION_OF> <OPEN_BRACKET>
+		v = twoOrMoreClassExpressions()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getObjectIntersectionOf(v);
+	}
+}
+
+/* 8.1.2 Union of Class Expressions */
+ElkObjectUnionOf objectUnionOf():
+{
+	List<ElkClassExpression> v;
+}{
+	<OBJECT_UNION_OF> <OPEN_BRACKET>
+		v = twoOrMoreClassExpressions()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getObjectUnionOf(v);
+	}
+}
+
+/* 8.1.3 Complement of Class Expressions */
+ElkObjectComplementOf objectComplementOf():
+{
+	ElkClassExpression x;
+}{
+	<OBJECT_COMPLEMENT_OF> <OPEN_BRACKET>
+		x = classExpression()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getObjectComplementOf(x);
+	}
+}
+
+/* 8.1.4 Enumeration of Individuals */
+ElkObjectOneOf objectOneOf():
+{
+	ElkIndividual x;
+	List<ElkIndividual> v =
+		new ArrayList<ElkIndividual> ();
+}{
+	<OBJECT_ONE_OF> <OPEN_BRACKET>
+		( x = individual() { v.add(x); } )+
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getObjectOneOf(v);
+	}
+}
+
+
+/* 8.2 Object Property Restrictions */
+
+/* 8.2.1 Existential Quantification */
+ElkObjectSomeValuesFrom objectSomeValuesFrom():
+{
+	ElkObjectPropertyExpression x;
+	ElkClassExpression y;
+}{
+	<OBJECT_SOME_VALUES_FROM> <OPEN_BRACKET>
+		x = objectPropertyExpression()
+		y = classExpression()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getObjectSomeValuesFrom(x, y);
+	}
+}
+
+/* 8.2.2 Universal Quantification */
+ElkObjectAllValuesFrom objectAllValuesFrom():
+{
+	ElkObjectPropertyExpression x;
+	ElkClassExpression y;
+}{
+	<OBJECT_ALL_VALUES_FROM> <OPEN_BRACKET>
+		x = objectPropertyExpression()
+		y = classExpression()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getObjectAllValuesFrom(x, y);
+	}
+}
+
+/* 8.2.3 Individual Value Restriction */
+ElkObjectHasValue objectHasValue():
+{
+	ElkObjectPropertyExpression x;
+	ElkIndividual y;
+}{
+	<OBJECT_HAS_VALUE> <OPEN_BRACKET>
+		x = objectPropertyExpression()
+		y = individual()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getObjectHasValue(x, y);
+	}
+}
+
+/* 8.2.4 Self-Restriction */
+ElkObjectHasSelf objectHasSelf():
+{
+	ElkObjectPropertyExpression x;
+}{
+	<OBJECT_HAS_SELF> <OPEN_BRACKET>
+		x = objectPropertyExpression()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getObjectHasSelf(x);
+	}
+}
+
+
+/* 8.3 Object Property Cardinality Restrictions */
+
+/* 8.3.1 Minimum Cardinality */
+ElkObjectMinCardinality objectMinCardinality():
+{
+	Token n;
+	ElkObjectPropertyExpression x;
+	ElkClassExpression y = null;
+}{
+	<OBJECT_MIN_CARDINALITY> <OPEN_BRACKET>
+		n = <NON_NEGATIVE_INTEGER>
+		x = objectPropertyExpression()
+		( y = classExpression() )?
+	<CLOSE_BRACKET> {
+		if (y == null)
+			return getElkObjectFactory().getObjectMinCardinalityUnqualified(x, Integer.parseInt( n.image ));
+		else
+			return getElkObjectFactory().getObjectMinCardinalityQualified(x, Integer.parseInt( n.image ), y);
+	}
+}
+
+/* 8.3.2 Maximum Cardinality */
+ElkObjectMaxCardinality objectMaxCardinality():
+{
+	Token n;
+	ElkObjectPropertyExpression x;
+	ElkClassExpression y = null;
+}{
+	<OBJECT_MAX_CARDINALITY> <OPEN_BRACKET>
+		n = <NON_NEGATIVE_INTEGER>
+		x = objectPropertyExpression()
+		( y = classExpression() )?
+	<CLOSE_BRACKET> {
+		if (y == null)
+			return getElkObjectFactory().getObjectMaxCardinalityUnqualified(x, Integer.parseInt( n.image ));
+		else
+			return getElkObjectFactory().getObjectMaxCardinalityQualified(x, Integer.parseInt( n.image ), y);
+	}
+}
+
+/* 8.3.3 Exact Cardinality */
+ElkObjectExactCardinality objectExactCardinality():
+{
+	Token n;
+	ElkObjectPropertyExpression x;
+	ElkClassExpression y = null;
+}{
+	<OBJECT_EXACT_CARDINALITY> <OPEN_BRACKET>
+		n = <NON_NEGATIVE_INTEGER>
+		x = objectPropertyExpression()
+		( y = classExpression() )?
+	<CLOSE_BRACKET> {
+		if (y == null)
+			return getElkObjectFactory().getObjectExactCardinalityUnqualified(x, Integer.parseInt( n.image ));
+		else
+			return getElkObjectFactory().getObjectExactCardinalityQualified(x, Integer.parseInt( n.image ), y);
+	}
+}
+
+/* 8.4 Data Property Restrictions */
+
+/* 8.4.1 Existential Quantification */
+ElkDataSomeValuesFrom dataSomeValuesFrom():
+{
+	List<ElkDataPropertyExpression> dpList = new ArrayList<ElkDataPropertyExpression>();
+	ElkDataRange dr;
+	ElkDataSomeValuesFrom result = null;
+}{
+	<DATA_SOME_VALUES_FROM> <OPEN_BRACKET>
+		addDataPropertyExpression(dpList)
+		result = dataSomeValuesFromSuffix(dpList)
+	{
+		return result;
+	}
+}
+
+ElkDataSomeValuesFrom dataSomeValuesFromSuffix(List<ElkDataPropertyExpression> dpList):
+{
+	ElkDataRange dr = null;
+	ElkDataSomeValuesFrom result = null;
+}{
+	(
+	LOOKAHEAD(3)
+	dr = dataRange() <CLOSE_BRACKET>
+	| 	(	addDataPropertyExpression(dpList)
+			result = dataSomeValuesFromSuffix(dpList)
+		) 
+	)
+	{
+		return getElkObjectFactory().getDataSomeValuesFrom(dpList, dr);
+	}
+}
+
+
+/* 8.4.2 Universal Quantification */
+ElkDataAllValuesFrom dataAllValuesFrom():
+{
+	List<ElkDataPropertyExpression> dpList = new ArrayList<ElkDataPropertyExpression>();
+	ElkDataRange dr;
+	ElkDataAllValuesFrom result = null;
+}{
+	<DATA_ALL_VALUES_FROM> <OPEN_BRACKET>
+		addDataPropertyExpression(dpList)
+		result = dataAllValuesFromSuffix(dpList)
+	{
+		return result;
+	}
+}
+
+ElkDataAllValuesFrom dataAllValuesFromSuffix(List<ElkDataPropertyExpression> dpList):
+{
+	ElkDataRange dr = null;
+	ElkDataAllValuesFrom result = null;
+}{
+	(
+	LOOKAHEAD(3)
+	dr = dataRange() <CLOSE_BRACKET>
+	| 	(	addDataPropertyExpression(dpList)
+			result = dataAllValuesFromSuffix(dpList)
+		) 
+	)
+	{
+		return getElkObjectFactory().getDataAllValuesFrom(dpList, dr);
+	}
+}
+
+/* 8.4.3 Literal Value Restriction */
+ElkDataHasValue dataHasValue():
+{
+	ElkDataPropertyExpression x;
+	ElkLiteral y;
+}{
+	<DATA_HAS_VALUE> <OPEN_BRACKET>
+		x = dataPropertyExpression()
+		y = literal()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getDataHasValue(x, y);
+	}
+}
+
+
+/* 8.5 Data Property Cardinality Restrictions */
+
+/* 8.5.1 Minimum Cardinality */
+ElkDataMinCardinality dataMinCardinality():
+{
+	Token n;
+	ElkDataPropertyExpression x;
+	ElkDataRange y = null;
+}{
+	<DATA_MIN_CARDINALITY> <OPEN_BRACKET>
+		n = <NON_NEGATIVE_INTEGER>
+		x = dataPropertyExpression()
+		( y = dataRange() )?
+	<CLOSE_BRACKET> {
+		if (y == null)
+			return getElkObjectFactory().getDataMinCardinalityUnqualified(x, Integer.parseInt( n.image ));
+		else
+			return getElkObjectFactory().getDataMinCardinalityQualified(x, Integer.parseInt( n.image ), y);
+	}
+}
+
+/* 8.5.2 Maximum Cardinality */
+ElkDataMaxCardinality dataMaxCardinality():
+{
+	Token n;
+	ElkDataPropertyExpression x;
+	ElkDataRange y = null;
+}{
+	<DATA_MAX_CARDINALITY> <OPEN_BRACKET>
+		n = <NON_NEGATIVE_INTEGER>
+		x = dataPropertyExpression()
+		( y = dataRange() )?
+	<CLOSE_BRACKET> {
+		if (y == null)
+			return getElkObjectFactory().getDataMaxCardinalityUnqualified(x, Integer.parseInt( n.image ));
+		else
+			return getElkObjectFactory().getDataMaxCardinalityQualified(x, Integer.parseInt( n.image ), y);
+	}
+}
+
+/* 8.5.3 Exact Cardinality */
+ElkDataExactCardinality dataExactCardinality():
+{
+	Token n;
+	ElkDataPropertyExpression x;
+	ElkDataRange y = null;
+}{
+	<DATA_EXACT_CARDINALITY> <OPEN_BRACKET>
+		n = <NON_NEGATIVE_INTEGER>
+		x = dataPropertyExpression()
+		( y = dataRange() )?
+	<CLOSE_BRACKET> {
+		if (y == null)
+			return getElkObjectFactory().getDataExactCardinalityUnqualified(x, Integer.parseInt( n.image ));
+		else
+			return getElkObjectFactory().getDataExactCardinalityQualified(x, Integer.parseInt( n.image ), y);
+	}
+}
+
+
+/* 9 Axioms */
+ElkAxiom axiom():
+{
+	ElkAxiom x = null; 
+}{
+	(
+	x = declaration()
+	| x = classAxiom()
+	| x = objectPropertyAxiom()
+	| x = dataPropertyAxiom()
+	| x = datatypeDefinition()
+	| x = hasKey()
+	| x = assertion()
+	| x = annotationAxiom()
+	| x = dlSafeRule()
+	) { return x; }
+}
+
+void axiomAnnotations():
+{}{
+	( annotation() )*
+}
+
+/* 9.1 Class Expression Axioms */
+ElkClassAxiom classAxiom():
+{
+	ElkClassAxiom x;
+}{ (
+	x = subClassOf()
+	| x = equivalentClasses()
+	| x = disjointClasses()
+	| x = disjointUnion()
+   ) { return x; }
+}
+
+/* 9.1.1 Subclass Axioms */
+ElkSubClassOfAxiom subClassOf():
+{
+	ElkClassExpression x, y;
+}{
+	<SUB_CLASS_OF> <OPEN_BRACKET>
+		axiomAnnotations()
+		x = classExpression()
+		y = classExpression()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getSubClassOfAxiom(x, y);
+	}
+}
+
+/* 9.1.2 Equivalent Classes */
+ElkEquivalentClassesAxiom equivalentClasses():
+{
+	List<ElkClassExpression> v;
+}{
+	<EQUIVALENT_CLASSES> <OPEN_BRACKET>
+		axiomAnnotations()
+		v = twoOrMoreClassExpressions()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getEquivalentClassesAxiom(v);
+	}
+}
+
+/* 9.1.3 Disjoint Classes */
+ElkDisjointClassesAxiom disjointClasses():
+{
+	List<ElkClassExpression> v;
+}{
+	<DISJOINT_CLASSES> <OPEN_BRACKET>
+		axiomAnnotations()
+		v = twoOrMoreClassExpressions()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getDisjointClassesAxiom(v);
+	}
+}
+
+/* 9.1.4 Disjoint Union of Class Expressions */
+ElkDisjointUnionAxiom disjointUnion():
+{
+	ElkClass x;
+	List<ElkClassExpression> v;
+}{
+	<DISJOINT_UNION> <OPEN_BRACKET>
+		axiomAnnotations()
+		x = clazz()
+		v = twoOrMoreClassExpressions()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getDisjointUnionAxiom(x, v);
+	}
+}
+
+List<ElkClassExpression> twoOrMoreClassExpressions():
+{
+	ElkClassExpression x;
+	List<ElkClassExpression> v =
+		new ArrayList<ElkClassExpression> ();
+}{
+	x = classExpression() { v.add(x); }
+	( x = classExpression() { v.add(x); } )+
+	{ return v; }
+}
+
+/* 9.2 Object Property Axioms */
+ElkObjectPropertyAxiom objectPropertyAxiom():
+{
+	ElkObjectPropertyAxiom x;
+}{
+	(
+	x = subObjectPropertyOf()
+	| x = equivalentObjectProperties()
+	| x = disjointObjectProperties()
+	| x = inverseObjectProperties()
+	| x = objectPropertyDomain()
+	| x = objectPropertyRange()
+	| x = functionalObjectProperty()
+	| x = inverseFunctionalObjectProperty()
+	| x = reflexiveObjectProperty()
+	| x = irreflexiveObjectProperty()
+	| x = symmetricObjectProperty()
+	| x = asymmetricObjectProperty()
+	| x = transitiveObjectProperty()
+	) { return x; }
+}
+
+/* 9.2.1 Object Subproperties */
+ElkSubObjectPropertyOfAxiom subObjectPropertyOf():
+{
+	ElkSubObjectPropertyExpression x = null;
+	ElkObjectPropertyExpression z;
+}{
+	<SUB_OBJECT_PROPERTY_OF> <OPEN_BRACKET>
+		axiomAnnotations()
+		(
+		  x = objectPropertyExpression()
+		| x = propertyExpressionChain()
+		)
+		z = objectPropertyExpression()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getSubObjectPropertyOfAxiom(x, z);
+	}
+}
+
+ElkObjectPropertyChain propertyExpressionChain():
+{
+	List<ElkObjectPropertyExpression> v;
+}{
+	<OBJECT_PROPERTY_CHAIN> <OPEN_BRACKET>
+		v = twoOrMoreObjectPropertyExpressions()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getObjectPropertyChain(v);
+	}
+}
+
+/* 9.2.2 Equivalent Object Properties */
+ElkEquivalentObjectPropertiesAxiom equivalentObjectProperties():
+{
+	List<ElkObjectPropertyExpression> v;
+}{
+	<EQUIVALENT_OBJECT_PROPERTIES> <OPEN_BRACKET>
+		axiomAnnotations()
+		v = twoOrMoreObjectPropertyExpressions()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getEquivalentObjectPropertiesAxiom(v);
+	}
+}
+
+/* 9.2.3 Disjoint Object Properties */
+ElkDisjointObjectPropertiesAxiom disjointObjectProperties():
+{
+	List<ElkObjectPropertyExpression> v;
+}{
+	<DISJOINT_OBJECT_PROPERTIES> <OPEN_BRACKET>
+		axiomAnnotations()
+		v = twoOrMoreObjectPropertyExpressions()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getDisjointObjectPropertiesAxiom(v);
+	}
+}
+
+List<ElkObjectPropertyExpression> twoOrMoreObjectPropertyExpressions():
+{
+	ElkObjectPropertyExpression x;
+	List<ElkObjectPropertyExpression> v =
+		new ArrayList<ElkObjectPropertyExpression> ();
+}{
+	x = objectPropertyExpression() { v.add(x); }
+	( x = objectPropertyExpression() { v.add(x); } )+
+	{ return v; }
+}
+
+/* 9.2.4 Inverse Object Properties */
+ElkInverseObjectPropertiesAxiom inverseObjectProperties():
+{
+	ElkObjectPropertyExpression x, y;
+}{
+	<INVERSE_OBJECT_PROPERTIES> <OPEN_BRACKET>
+		axiomAnnotations()
+		x = objectPropertyExpression()
+		y = objectPropertyExpression()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getInverseObjectPropertiesAxiom(x, y);
+	}
+}
+
+/* 9.2.5 Object Property Domain */
+ElkObjectPropertyDomainAxiom objectPropertyDomain():
+{
+	ElkObjectPropertyExpression x;
+	ElkClassExpression y;
+}{
+	<OBJECT_PROPERTY_DOMAIN> <OPEN_BRACKET>
+		axiomAnnotations()
+		x = objectPropertyExpression()
+		y = classExpression()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getObjectPropertyDomainAxiom(x, y);
+	}
+}
+
+/* 9.2.6 Object Property Range */
+ElkObjectPropertyRangeAxiom objectPropertyRange():
+{
+	ElkObjectPropertyExpression x;
+	ElkClassExpression y;
+}{
+	<OBJECT_PROPERTY_RANGE> <OPEN_BRACKET>
+		axiomAnnotations()
+		x = objectPropertyExpression()
+		y = classExpression()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getObjectPropertyRangeAxiom(x, y);
+	}
+}
+
+/* 9.2.7 Functional Object Properties */
+ElkFunctionalObjectPropertyAxiom functionalObjectProperty():
+{
+	ElkObjectPropertyExpression x;
+}{
+	<FUNCTIONAL_OBJECT_PROPERTY> <OPEN_BRACKET>
+		axiomAnnotations()
+		x = objectPropertyExpression()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getFunctionalObjectPropertyAxiom(x);
+	}
+}
+
+/* 9.2.8 Inverse-Functional Object Properties */
+ElkInverseFunctionalObjectPropertyAxiom inverseFunctionalObjectProperty():
+{
+	ElkObjectPropertyExpression x;
+}{
+	<INVERSE_FUNCTIONAL_OBJECT_PROPERTY> <OPEN_BRACKET>
+		axiomAnnotations()
+		x = objectPropertyExpression()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getInverseFunctionalObjectPropertyAxiom(x);
+	}
+}
+
+/* 9.2.9 Reflexive Object Properties */
+ElkReflexiveObjectPropertyAxiom reflexiveObjectProperty():
+{
+	ElkObjectPropertyExpression x;
+}{
+	<REFLEXIVE_OBJECT_PROPERTY> <OPEN_BRACKET>
+		axiomAnnotations()
+		x = objectPropertyExpression()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getReflexiveObjectPropertyAxiom(x);
+	}
+}
+
+/* 9.2.10 Irreflexive Object Properties */
+ElkIrreflexiveObjectPropertyAxiom irreflexiveObjectProperty():
+{
+	ElkObjectPropertyExpression x;
+}{
+	<IRREFLEXIVE_OBJECT_PROPERTY> <OPEN_BRACKET>
+		axiomAnnotations()
+		x = objectPropertyExpression()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getIrreflexiveObjectPropertyAxiom(x);
+	}
+}
+
+/* 9.2.11 Symmetric Object Properties */
+ElkSymmetricObjectPropertyAxiom symmetricObjectProperty():
+{
+	ElkObjectPropertyExpression x;
+}{
+	<SYMMETRIC_OBJECT_PROPERTY> <OPEN_BRACKET>
+		axiomAnnotations()
+		x = objectPropertyExpression()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getSymmetricObjectPropertyAxiom(x);
+	}
+}
+
+/* 9.2.12 Asymmetric Object Properties */
+ElkAsymmetricObjectPropertyAxiom asymmetricObjectProperty():
+{
+	ElkObjectPropertyExpression x;
+}{
+	<ASYMMETRIC_OBJECT_PROPERTY> <OPEN_BRACKET>
+		axiomAnnotations()
+		x = objectPropertyExpression()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getAsymmetricObjectPropertyAxiom(x);
+	}
+}
+
+/* 9.2.13 Transitive Object Properties */
+ElkTransitiveObjectPropertyAxiom transitiveObjectProperty():
+{
+	ElkObjectPropertyExpression x;
+}{
+	<TRANSITIVE_OBJECT_PROPERTY> <OPEN_BRACKET>
+		axiomAnnotations()
+		x = objectPropertyExpression()
+	<CLOSE_BRACKET>{
+		return getElkObjectFactory().getTransitiveObjectPropertyAxiom(x);
+	}
+}
+
+/* 9.3 Data Property Axioms */
+ElkDataPropertyAxiom dataPropertyAxiom():
+{
+	ElkDataPropertyAxiom x;
+}{
+	(
+	x = subDataPropertyOf()
+	| x = equivalentDataProperties()
+	| x = disjointDataProperties()
+	| x = dataPropertyDomain()
+	| x = dataPropertyRange()
+	| x = functionalDataProperty()
+	) { return x; }
+}
+
+/* 9.3.1 Data Subproperties */
+ElkSubDataPropertyOfAxiom subDataPropertyOf():
+{
+	ElkDataPropertyExpression sub,sup;
+}{
+	<SUB_DATA_PROPERTY_OF> <OPEN_BRACKET>
+		axiomAnnotations()
+		sub = dataPropertyExpression()
+		sup = dataPropertyExpression()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getSubDataPropertyOfAxiom(sub, sup);
+	}
+}
+
+/* 9.3.2 Equivalent Data Properties */
+ElkEquivalentDataPropertiesAxiom equivalentDataProperties():
+{
+	List<ElkDataPropertyExpression> v;
+}{
+	<EQUIVALENT_DATA_PROPERTIES> <OPEN_BRACKET>
+		axiomAnnotations()
+		v = twoOrMoreDataPropertyExpressions()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getEquivalentDataPropertiesAxiom(v);
+	}
+}
+
+/* 9.3.3 Disjoint Data Properties */
+ElkDisjointDataPropertiesAxiom disjointDataProperties():
+{
+	List<ElkDataPropertyExpression> v;
+}{
+	<DISJOINT_DATA_PROPERTIES> <OPEN_BRACKET>
+		axiomAnnotations()
+		v = twoOrMoreDataPropertyExpressions()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getDisjointDataPropertiesAxiom(v);
+	}
+}
+
+List<ElkDataPropertyExpression> twoOrMoreDataPropertyExpressions():
+{
+	ElkDataPropertyExpression x;
+	List<ElkDataPropertyExpression> v =
+		new ArrayList<ElkDataPropertyExpression> ();
+}{
+	x = dataPropertyExpression() { v.add(x); }
+	( x = dataPropertyExpression() { v.add(x); } )+
+	{ return v; }
+}
+
+
+/* 9.3.4 Data Property Domain */
+ElkDataPropertyDomainAxiom dataPropertyDomain():
+{
+	ElkDataPropertyExpression x;
+	ElkClassExpression y;
+}{
+	<DATA_PROPERTY_DOMAIN> <OPEN_BRACKET>
+		axiomAnnotations()
+		x = dataPropertyExpression()
+		y = classExpression()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getDataPropertyDomainAxiom(x, y);
+	}
+}
+
+/* 9.3.5 Data Property Range */
+ElkDataPropertyRangeAxiom dataPropertyRange():
+{
+	ElkDataPropertyExpression x;
+	ElkDataRange y;
+}{
+	<DATA_PROPERTY_RANGE> <OPEN_BRACKET>
+		axiomAnnotations()
+		x = dataPropertyExpression()
+		y = dataRange()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getDataPropertyRangeAxiom(x, y);
+	}
+}
+
+/* 9.3.6 Functional Data Properties */
+ElkFunctionalDataPropertyAxiom functionalDataProperty():
+{
+	ElkDataPropertyExpression x;
+}{
+	<FUNCTIONAL_DATA_PROPERTY> <OPEN_BRACKET>
+		axiomAnnotations()
+		x = dataPropertyExpression()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getFunctionalDataPropertyAxiom(x);
+	}
+}
+
+/* 9.4 Datatype Definitions */
+ElkDatatypeDefinitionAxiom datatypeDefinition():
+{
+	ElkDatatype dt = null;
+	ElkDataRange dr = null;
+}{
+	<DATATYPE_DEFINITION> <OPEN_BRACKET>
+		axiomAnnotations()
+		dt = datatype()
+		dr = dataRange()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getDatatypeDefinitionAxiom(dt, dr);
+	}
+}
+
+/* 9.5 Keys */
+ElkHasKeyAxiom hasKey():
+{
+	ElkClassExpression ce = null;
+	ElkObjectPropertyExpression x;
+	ElkDataPropertyExpression y;
+	List<ElkObjectPropertyExpression> opes = new ArrayList<ElkObjectPropertyExpression>();
+	List<ElkDataPropertyExpression> dpes = new ArrayList<ElkDataPropertyExpression>();	
+}{
+	<HAS_KEY> <OPEN_BRACKET>
+		axiomAnnotations()
+		ce = classExpression()
+		<OPEN_BRACKET> ( x = objectPropertyExpression() { opes.add(x); } )* <CLOSE_BRACKET>
+		<OPEN_BRACKET> ( y = dataPropertyExpression() { dpes.add(y); } )* <CLOSE_BRACKET>
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getHasKeyAxiom(ce, opes, dpes);
+	}
+}
+
+/* SWRL Rules, we don't parse them, just skip through */
+ElkSWRLRule dlSafeRule():
+{
+}{
+	<SWRL_RULE> <OPEN_BRACKET>
+		skipToMatchingBrace()
+	{return getElkObjectFactory().getSWRLRule();}
+}
+
+JAVACODE
+    void skipToMatchingBrace() {
+      Token tok;
+      int nesting = 1;
+      while (true) {
+        tok = getNextToken();
+      
+        if (tok.kind == OPEN_BRACKET) nesting++;
+        if (tok.kind == CLOSE_BRACKET) {
+          nesting--;
+          if (nesting == 0) break;
+        }
+      }
+    }
+
+
+/* 9.6 Assertions */
+ElkAssertionAxiom assertion():
+{
+	ElkAssertionAxiom x;
+}{
+	(
+	x = sameIndividual()
+	| x = differentIndividuals()
+	| x = classAssertion()
+	| x = objectPropertyAssertion()
+	| x = negativeObjectPropertyAssertion()
+	| x = dataPropertyAssertion()
+	| x = negativeDataPropertyAssertion()
+	) { return x; }
+}
+
+/* 9.6.1 Individual Equality */
+ElkSameIndividualAxiom sameIndividual():
+{
+	List<ElkIndividual> v;
+}{
+	<SAME_INDIVIDUAL> <OPEN_BRACKET>
+		axiomAnnotations()
+		v = twoOrMoreIndividuals()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getSameIndividualAxiom(v);
+	}
+}
+
+/* 9.6.2 Individual Inequality */
+ElkDifferentIndividualsAxiom differentIndividuals():
+{
+	List<ElkIndividual> v;
+}{
+	<DIFFERENT_INDIVIDUALS> <OPEN_BRACKET>
+		axiomAnnotations()
+		v = twoOrMoreIndividuals()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getDifferentIndividualsAxiom(v);
+	}
+}
+
+List<ElkIndividual> twoOrMoreIndividuals():
+{
+	ElkIndividual x;
+	List<ElkIndividual> v =
+		new ArrayList<ElkIndividual> ();
+}{
+	x = individual() { v.add(x); }
+	( x = individual() { v.add(x); } )+
+	{ return v;	}
+}
+
+/* 9.6.3 Class Assertions */
+ElkClassAssertionAxiom classAssertion():
+{
+	ElkClassExpression x;
+	ElkIndividual y;
+}{
+	<CLASS_ASSERTION> <OPEN_BRACKET>
+		axiomAnnotations()
+		x = classExpression()
+		y = individual()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getClassAssertionAxiom(x, y);
+	}
+}
+
+/* 9.6.4 Positive Object Property Assertions */
+ElkObjectPropertyAssertionAxiom objectPropertyAssertion():
+{
+	ElkObjectPropertyExpression x;
+	ElkIndividual sourceIndividual, targetIndividual;
+}{
+	<OBJECT_PROPERTY_ASSERTION> <OPEN_BRACKET>
+		axiomAnnotations()
+		x = objectPropertyExpression()
+		sourceIndividual = individual()
+		targetIndividual = individual()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getObjectPropertyAssertionAxiom(x, sourceIndividual, targetIndividual);
+	}
+}
+
+/* 9.6.5 Negative Object Property Assertions */
+ElkNegativeObjectPropertyAssertionAxiom negativeObjectPropertyAssertion():
+{
+	ElkObjectPropertyExpression x;
+	ElkIndividual sourceIndividual, targetIndividual;
+}{
+	<NEGATIVE_OBJECT_PROPERTY_ASSERTION> <OPEN_BRACKET>
+		axiomAnnotations()
+		x = objectPropertyExpression()
+		sourceIndividual = individual()
+		targetIndividual = individual()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getNegativeObjectPropertyAssertionAxiom(x, sourceIndividual, targetIndividual);
+	}
+}
+
+/* 9.6.6 Positive Data Property Assertions */
+ElkDataPropertyAssertionAxiom dataPropertyAssertion():
+{
+	ElkDataPropertyExpression x;
+	ElkIndividual sourceIndividual;
+	ElkLiteral targetLiteral;
+}{
+	<DATA_PROPERTY_ASSERTION> <OPEN_BRACKET>
+		axiomAnnotations()
+		x = dataPropertyExpression()
+		sourceIndividual = individual()
+		targetLiteral = literal()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getDataPropertyAssertionAxiom(x, sourceIndividual, targetLiteral);
+	}
+}
+
+/* 9.6.7 Negative Data Property Assertions */
+ElkNegativeDataPropertyAssertionAxiom negativeDataPropertyAssertion():
+{
+	ElkDataPropertyExpression x;
+	ElkIndividual sourceIndividual;
+	ElkLiteral targetLiteral;
+}{
+	<NEGATIVE_DATA_PROPERTY_ASSERTION> <OPEN_BRACKET>
+		axiomAnnotations()
+		x = dataPropertyExpression()
+		sourceIndividual = individual()
+		targetLiteral = literal()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getNegativeDataPropertyAssertionAxiom(x, sourceIndividual, targetLiteral);
+	}
+}
+
+
+/* 10 Annotations */
+
+/* 10.1 Annotations of Ontologies, Axioms, and other Annotations */
+//TODO annotations are not part of the ELK model, the returned value is ignored 
+ElkAnnotation annotation(): 
+{
+	ElkAnnotationProperty property;
+	ElkAnnotationValue value;
+}{
+	<ANNOTATION> <OPEN_BRACKET>
+		annotationAnnotations()
+		property = annotationProperty()
+		value = annotationValue()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getAnnotation(property, value);
+	}
+}
+
+void annotationAnnotations():
+{}{
+	( annotation() )*
+}
+
+ElkAnnotationValue annotationValue():
+{
+	ElkAnnotationValue value = null;
+}{
+	( value = anonymousIndividual() 
+	| value = iri() 
+	| value = literal()
+	) {
+		return value;
+	}
+}
+
+/* 10.2 Annotation Axioms */
+ElkAnnotationAxiom annotationAxiom():
+{
+	ElkAnnotationAxiom annAxiom = null;
+}{
+	( annAxiom = annotationAssertion()
+	| annAxiom = subAnnotationPropertyOf()
+	| annAxiom = annotationPropertyDomain()
+	| annAxiom = annotationPropertyRange()
+	) { 
+		return annAxiom; 
+	}
+}
+
+/* 10.2.1 Annotation Assertion */
+ElkAnnotationAssertionAxiom annotationAssertion():
+{
+	ElkAnnotationProperty property = null;
+	ElkAnnotationSubject subject = null;
+	ElkAnnotationValue value = null;
+}{
+	<ANNOTATION_ASSERTION> <OPEN_BRACKET>
+		axiomAnnotations()
+		property = annotationProperty()
+		subject = annotationSubject()
+		value = annotationValue()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getAnnotationAssertionAxiom(property, subject, value);
+	}
+}
+
+ElkAnnotationSubject annotationSubject():
+{
+	ElkAnnotationSubject subject = null;
+}{
+	( subject = iri() 
+	| subject = anonymousIndividual()
+	) {
+		return subject;
+	}
+}
+
+/* 10.2.2 Annotation Subproperties */
+ElkSubAnnotationPropertyOfAxiom subAnnotationPropertyOf():
+{
+	ElkAnnotationProperty subProperty = null;
+	ElkAnnotationProperty superProperty = null;
+}{
+	<SUB_ANNOTATION_PROPERTY_OF> <OPEN_BRACKET>
+		axiomAnnotations()
+		subProperty = annotationProperty()
+		superProperty = annotationProperty()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getSubAnnotationPropertyOfAxiom(subProperty, superProperty);
+	}
+}
+
+
+/* 10.2.3 Annotation Property Domain */
+ElkAnnotationPropertyDomainAxiom annotationPropertyDomain():
+{
+	ElkAnnotationProperty property = null;
+	ElkIri domain = null;
+}{
+	<ANNOTATION_PROPERTY_DOMAIN> <OPEN_BRACKET>
+		axiomAnnotations()
+		property = annotationProperty()
+		domain = iri()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getAnnotationPropertyDomainAxiom(property, domain);
+	}
+}
+
+/* 10.2.4 Annotation Property Range */
+ElkAnnotationPropertyRangeAxiom annotationPropertyRange():
+{
+	ElkAnnotationProperty property = null;
+	ElkIri range = null;
+}{
+	<ANNOTATION_PROPERTY_RANGE> <OPEN_BRACKET>
+		axiomAnnotations()
+		property = annotationProperty()
+		range = iri()
+	<CLOSE_BRACKET> {
+		return getElkObjectFactory().getAnnotationPropertyRangeAxiom(property, range);
+	}
+}
